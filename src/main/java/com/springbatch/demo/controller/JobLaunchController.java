@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobLaunchController {
     private final JobOperator jobOperator;
 
-    @Qualifier("firstJob")
+    @Qualifier("job2")
     private final Job job;
 
     @GetMapping("/launchJob/{id}")

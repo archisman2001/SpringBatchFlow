@@ -5,7 +5,9 @@ import com.springbatch.demo.listener.MyStepExecutionListener;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.batch.core.job.flow.JobExecutionDecider;
 import org.springframework.batch.core.listener.StepExecutionListener;
 import org.springframework.batch.core.repository.JobRepository;
@@ -17,6 +19,7 @@ import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -57,12 +60,6 @@ public class BatchConfiguration {
         return new StepBuilder("step2", jobRepository).tasklet(new Tasklet() {
             @Override
             public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-
-                boolean isFailure=false;
-                if(isFailure){
-                    throw new Exception("Test Exception");
-                }
-
                 System.out.println("step2 executed!!");
                 return RepeatStatus.FINISHED;
             }
@@ -83,6 +80,28 @@ public class BatchConfiguration {
     }
 
     @Bean
+    public Step step5(){
+        return new StepBuilder("step5", jobRepository).tasklet(new Tasklet() {
+            @Override
+            public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+                System.out.println("step5 executed!!");
+                return RepeatStatus.FINISHED;
+            }
+        }, transactionManager).build();
+    }
+
+    @Bean
+    public Step step6(){
+        return new StepBuilder("step6", jobRepository).tasklet(new Tasklet() {
+            @Override
+            public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
+                System.out.println("step6 executed!!");
+                return RepeatStatus.FINISHED;
+            }
+        }, transactionManager).build();
+    }
+
+    @Bean
     public Step step4(){
         return new StepBuilder("step4", jobRepository).tasklet(new Tasklet() {
             @Override
@@ -94,35 +113,30 @@ public class BatchConfiguration {
     }
 
     @Bean
-    public Job firstJob(){
-        // 1. Sequential flow
-//        return new JobBuilder("job1", jobRepository)
-//                .preventRestart()
-//                .start(step1())
-//                .next(step2())
-//                .next(step3())
-//                .build();
-//    }
+    public Flow flow1(){
+        return new FlowBuilder<Flow>("flow1")
+                .start(step3())
+                .next(step4())
+                .build();
+    }
 
-        // 2. Conditional flow using StepExecutionListener
-//        return new JobBuilder("job1", jobRepository)
-//                .start(step1())
-//                    .on("COMPLETED").to(step2())
-//                .from(step2())
-//                    .on("TEST_STATUS").to(step3())
-//                .from(step2())
-//                    .on("*").to(step4())              // (* means all (STOPPED, FAILED...etc)
-//                .end()
-//                .build();
-
-
-        // 2. Conditional flow using JobExecutionDecider
+    @Bean
+    public Job job1(){
         return new JobBuilder("job1", jobRepository)
                 .start(step1())
-                    .on("COMPLETED").to(decider())
-                        .on("TEST_STATUS").to(step2())
-                .from(decider())
-                    .on("*").to(step3())
+                .next(step2())
+                    .on("COMPLETED").to(flow1())
+                .end()
+                .build();
+    }
+
+    @Bean
+    @Primary
+    public Job job2(){
+        return new JobBuilder("job2", jobRepository)
+                .start(flow1())
+                .next(step5())
+                .next(step6())
                 .end()
                 .build();
     }
