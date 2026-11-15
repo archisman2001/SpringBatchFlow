@@ -1,6 +1,7 @@
 package com.springbatch.demo.config;
 
 import com.springbatch.demo.decider.MyJobExecutionDecider;
+import com.springbatch.demo.listener.MyJobExecutionListener;
 import com.springbatch.demo.listener.MyStepExecutionListener;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -9,6 +10,7 @@ import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.batch.core.job.flow.JobExecutionDecider;
+import org.springframework.batch.core.listener.JobExecutionListener;
 import org.springframework.batch.core.listener.StepExecutionListener;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.scope.context.ChunkContext;
@@ -20,6 +22,7 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -33,6 +36,11 @@ public class BatchConfiguration {
 //
 //	@Autowired
 //	public StepBuilderFactory stepBuilderFactory;
+
+    @Bean
+    public MyJobExecutionListener myJobExecutionListener(){
+        return new MyJobExecutionListener();
+    }
 
     @Bean
     public StepExecutionListener myStepExecutionListener(){
@@ -73,7 +81,7 @@ public class BatchConfiguration {
         return new StepBuilder("step3", jobRepository).tasklet(new Tasklet() {
             @Override
             public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-                System.out.println("step3 executed!!");
+                System.out.println("step3 executed!! on Thread : "+Thread.currentThread().getName());
                 return RepeatStatus.FINISHED;
             }
         }, transactionManager).build();
@@ -84,7 +92,7 @@ public class BatchConfiguration {
         return new StepBuilder("step5", jobRepository).tasklet(new Tasklet() {
             @Override
             public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-                System.out.println("step5 executed!!");
+                System.out.println("step5 executed!! on Thread : "+Thread.currentThread().getName());
                 return RepeatStatus.FINISHED;
             }
         }, transactionManager).build();
@@ -95,7 +103,7 @@ public class BatchConfiguration {
         return new StepBuilder("step6", jobRepository).tasklet(new Tasklet() {
             @Override
             public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-                System.out.println("step6 executed!!");
+                System.out.println("step6 executed!! on Thread : "+Thread.currentThread().getName());
                 return RepeatStatus.FINISHED;
             }
         }, transactionManager).build();
@@ -106,10 +114,15 @@ public class BatchConfiguration {
         return new StepBuilder("step4", jobRepository).tasklet(new Tasklet() {
             @Override
             public @Nullable RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-                System.out.println("step4 executed!!");
+                System.out.println("step4 executed!! on Thread : "+Thread.currentThread().getName());
                 return RepeatStatus.FINISHED;
             }
         }, transactionManager).build();
+    }
+
+    @Bean
+    public Step job3Step(){
+        return new StepBuilder("job3Step", jobRepository).job(job3()).build();
     }
 
     @Bean
@@ -117,6 +130,14 @@ public class BatchConfiguration {
         return new FlowBuilder<Flow>("flow1")
                 .start(step3())
                 .next(step4())
+                .build();
+    }
+
+    @Bean
+    public Flow flow2(){
+        return new FlowBuilder<Flow>("flow2")
+                .start(step5())
+                .next(step6())
                 .build();
     }
 
@@ -134,10 +155,20 @@ public class BatchConfiguration {
     @Primary
     public Job job2(){
         return new JobBuilder("job2", jobRepository)
+                .listener(myJobExecutionListener())
                 .start(flow1())
-                .next(step5())
-                .next(step6())
+//                .next(job3Step())   //Nested job
+                .split(new SimpleAsyncTaskExecutor())
+                .add(flow2())
                 .end()
+                .build();
+    }
+
+    @Bean
+    public Job job3(){
+        return new JobBuilder("job3", jobRepository)
+                .start(step5())
+                .next(step6())
                 .build();
     }
 }
